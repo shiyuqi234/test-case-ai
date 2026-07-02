@@ -6,13 +6,13 @@ import argparse
 import os
 import sys
 
-from .generator import generate, generate_from_openapi
+from .generator import PROVIDERS, generate, generate_from_openapi
 from .openapi_parser import OpenAPIParseError, fetch_spec, get_base_url, parse_endpoints
 
 
 def cmd_generate(args: argparse.Namespace) -> None:
     """Handle the 'generate' subcommand."""
-    api_key = args.api_key or os.getenv("ANTHROPIC_API_KEY", "")
+    api_key = args.api_key or os.getenv(PROVIDERS[args.provider]["env_var"], "")
 
     try:
         if args.openapi:
@@ -21,16 +21,21 @@ def cmd_generate(args: argparse.Namespace) -> None:
             base_url = args.base_url or get_base_url(spec)
             endpoints = parse_endpoints(spec)
             if args.verbose:
-                print(f"Parsed {len(endpoints)} endpoint(s) from {args.openapi}", file=sys.stderr)
+                print(
+                    f"Parsed {len(endpoints)} endpoint(s) from {args.openapi}",
+                    file=sys.stderr,
+                )
                 for ep in endpoints:
                     print(f"  {ep['method']} {ep['path']}", file=sys.stderr)
             result = generate_from_openapi(
-                endpoints, base_url=base_url, api_key=api_key, model=args.model
+                endpoints, base_url=base_url, api_key=api_key,
+                model=args.model, provider=args.provider,
             )
         elif args.desc:
             # Natural language description mode
             result = generate(
-                args.desc, base_url=args.base_url, api_key=api_key, model=args.model
+                args.desc, base_url=args.base_url, api_key=api_key,
+                model=args.model, provider=args.provider,
             )
         else:
             print("Error: must provide either --desc or --openapi", file=sys.stderr)
@@ -60,8 +65,8 @@ def main() -> None:
     """Main CLI entry point for `tai`."""
     parser = argparse.ArgumentParser(
         prog="tai",
-        description="AI-powered test case generator using Claude API. "
-        "Generates test-sprint-lite compatible YAML.",
+        description="AI-powered test case generator. "
+        "Generates test-sprint-lite compatible YAML via Claude, DeepSeek, or OpenAI.",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -96,18 +101,26 @@ def main() -> None:
         help="Base URL for the API (auto-detected from OpenAPI spec if omitted)",
     )
     gen_parser.add_argument(
-        "--api-key",
+        "--provider", "-p",
         type=str,
-        default="",
-        metavar="KEY",
-        help="Anthropic API key (or set ANTHROPIC_API_KEY env var)",
+        default="anthropic",
+        choices=list(PROVIDERS.keys()),
+        metavar="PROVIDER",
+        help="LLM provider: anthropic, deepseek, openai (default: anthropic)",
     )
     gen_parser.add_argument(
         "--model",
         type=str,
-        default="claude-sonnet-5",
+        default="",
         metavar="MODEL",
-        help="Claude model to use (default: claude-sonnet-5)",
+        help="Model name (default: provider-dependent, e.g. claude-sonnet-5 / deepseek-chat)",
+    )
+    gen_parser.add_argument(
+        "--api-key",
+        type=str,
+        default="",
+        metavar="KEY",
+        help="API key (or set ANTHROPIC_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY env var)",
     )
     gen_parser.add_argument(
         "--verbose", "-v",

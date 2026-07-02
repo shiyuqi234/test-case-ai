@@ -29,6 +29,10 @@ htmlcov/
 .env
 .env.local
 
+# Generated test outputs
+login.yaml
+*.generated.yaml
+
 # OS
 .DS_Store
 Thumbs.db

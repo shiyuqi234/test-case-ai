@@ -139,3 +139,59 @@ class TestCLIGenerate:
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 assert exc_info.value.code == 1
+
+
+class TestCLIProviderFlag:
+    """Tests for the --provider flag."""
+
+    def test_deepseek_provider_passes_env_var(self, monkeypatch):
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "test-ds-key")
+
+        with mock.patch("sys.argv", [
+            "tai", "generate", "--desc", "GET /test", "--provider", "deepseek"
+        ]):
+            with mock.patch("test_case_ai.cli.generate") as mock_gen:
+                mock_gen.return_value = "name: Test\ntests: []"
+                try:
+                    main()
+                except SystemExit:
+                    pass
+                mock_gen.assert_called_once()
+                call_kwargs = mock_gen.call_args[1]
+                assert call_kwargs["api_key"] == "test-ds-key"
+                assert call_kwargs["provider"] == "deepseek"
+
+    def test_deepseek_openapi_mode(self, monkeypatch):
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "test-ds-key")
+
+        with mock.patch("sys.argv", [
+            "tai", "generate", "--openapi", "https://example.com/api.json",
+            "--provider", "deepseek",
+        ]):
+            with mock.patch("test_case_ai.cli.fetch_spec") as mock_fetch, \
+                 mock.patch("test_case_ai.cli.parse_endpoints") as mock_parse, \
+                 mock.patch("test_case_ai.cli.generate_from_openapi") as mock_gen:
+                mock_fetch.return_value = {"openapi": "3.0.0", "paths": {}}
+                mock_parse.return_value = []
+                mock_gen.return_value = "name: Test\ntests: []"
+                try:
+                    main()
+                except SystemExit:
+                    pass
+                call_kwargs = mock_gen.call_args[1]
+                assert call_kwargs["provider"] == "deepseek"
+
+    def test_openai_provider(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-oai-key")
+
+        with mock.patch("sys.argv", [
+            "tai", "generate", "--desc", "GET /test", "--provider", "openai"
+        ]):
+            with mock.patch("test_case_ai.cli.generate") as mock_gen:
+                mock_gen.return_value = "name: Test\ntests: []"
+                try:
+                    main()
+                except SystemExit:
+                    pass
+                call_kwargs = mock_gen.call_args[1]
+                assert call_kwargs["provider"] == "openai"
