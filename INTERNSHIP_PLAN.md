@@ -15,6 +15,7 @@
 
 | 仓库 | 语言 | 状态 | 一句话 |
 |---|---|---|---|
+| **test-case-ai** | Python | ✅ 已完成 | LLM 驱动的智能测试用例生成 CLI 工具 |
 | **test-sprint-lite** | Python | ✅ 已工程化 | YAML 驱动的 API 自动化测试 CLI 工具 |
 | **ecommerce-api-test** | Python | 基础完成 | pytest + Allure 的 FakeStore API 测试套件 |
 | **essay-scoring-system** | Java | 课程作业级 | Spring Boot 作文评分 Web 应用（非真 AI） |
@@ -34,37 +35,39 @@
 
 ---
 
-## 三、待做项目：test-case-ai（2-3 天）
+## 三、test-case-ai（✅ 已完成）
 
 ### 定位
-**AI Agent × 测试** —— 基于 Claude API 的智能测试用例生成工具
+**AI Agent × 测试** —— 基于大语言模型的智能测试用例生成工具
 
 ### 一句话描述
-> 输入 API 描述 / OpenAPI spec → Claude API 自动分析接口 → 生成 test-sprint-lite 兼容的 YAML 测试用例
+> 输入 API 描述 / OpenAPI spec → LLM 自动分析接口 → 生成 test-sprint-lite 兼容的 YAML 测试用例
 
 ### 技术栈
 | 层 | 选型 |
 |---|---|
-| LLM | Claude API（anthropic SDK） |
+| LLM | Claude API / DeepSeek / OpenAI 三 provider 可切换 |
 | CLI | argparse（与 tsp 风格一致） |
 | 输入 | OpenAPI spec URL / 自然语言描述 |
 | 输出 | test-sprint-lite 兼容的 YAML |
-| 测试 | pytest + mock Claude API 响应 |
+| 测试 | 60 个 pytest + mock LLM 响应 |
 | 打包 | pyproject.toml + CLI entry_point `tai` |
 
-### 工期拆分
+### 实际成果
 
-| 阶段 | 内容 | 预计 |
-|---|---|---|
-| Day 1 | CLI 骨架 + Claude API 调用 + 基础 prompt → 生成 YAML | 3-4h |
-| Day 2 | 打磨 prompt 质量 + 支持 OpenAPI spec 解析 + 写测试 | 3-4h |
-| Day 3 | pyproject.toml + CI + README + 推到 GitHub | 2-3h |
+| 维度 | 数据 |
+|---|---|
+| 测试 | 60 个 pytest，覆盖率 85% |
+| Lint | ruff 零报错 |
+| CI/CD | GitHub Actions 4 个 Python 版本矩阵 |
+| Provider | Anthropic / DeepSeek / OpenAI |
+| 实测 | DeepSeek 一键生成 21 个覆盖全面的测试用例（正常/边界/异常/类型/认证/特殊字符） |
 
-### 使用方式（最终效果）
+### 使用方式
 
 ```bash
-# 自然语言生成
-tai generate --desc "POST /api/login, body: {username, password}, returns {token}" -o login.yaml
+# 自然语言生成（DeepSeek）
+tai generate --provider deepseek --desc "POST /api/login, body: {username, password}, returns {token}" -o login.yaml
 
 # OpenAPI spec 生成
 tai generate --openapi https://petstore.swagger.io/v2/swagger.json -o petstore.yaml
@@ -74,9 +77,9 @@ tai generate --desc "..." | tsp run --file -
 ```
 
 ### 简历 bullet points
-- 基于 Claude API 实现 LLM 驱动的测试用例自动生成，覆盖正常/边界/异常场景
-- 支持自然语言描述和 OpenAPI Spec 两种输入，输出兼容自研 Test Sprint Lite 框架
-- 打通"AI 生成 → 自动执行 → 报告输出"全链路
+- 基于 Claude/DeepSeek/OpenAI 多 provider 实现 LLM 驱动的测试用例自动生成，覆盖正常/边界/异常/类型校验/认证场景
+- 支持自然语言描述和 OpenAPI Spec（Swagger 2.0 / OpenAPI 3.x）两种输入，输出兼容自研 Test Sprint Lite 框架
+- 打通"AI 生成 → 自动执行 → 报告输出"全链路，60 个 pytest 测试保证代码质量
 
 ---
 
@@ -176,10 +179,10 @@ tai generate --desc "..." | tsp run --file -
 
 ### 已完成 ✅
 - [x] test-sprint-lite 工程化改造（git / pytest / CI / README）
-- [x] 推送到 GitHub
+- [x] **test-case-ai Agent 项目**（CLI + 多 provider + 60 test + CI + README）
 
 ### 进行中 🔄
-- [ ] **test-case-ai Agent 项目**（下次对话开始）
+- [ ] 投递简历
 
 ### 待做 📋
 - [ ] 投递简历
