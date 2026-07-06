@@ -41,10 +41,30 @@ def _validate_yaml(yaml_str: str) -> dict:
     Raises:
         ValueError: If YAML is invalid or missing required fields.
     """
+    data = None
+    errors = []
+
+    # Try original first
     try:
         data = yaml.safe_load(yaml_str)
     except yaml.YAMLError as e:
-        raise ValueError(f"LLM returned invalid YAML: {e}") from e
+        errors.append(f"original: {e}")
+
+    # If failed, try auto-fixing common issues
+    if data is None:
+        fixed = _fix_common_yaml_issues(yaml_str)
+        try:
+            data = yaml.safe_load(fixed)
+        except yaml.YAMLError as e:
+            errors.append(f"after auto-fix: {e}")
+
+    if data is None:
+        preview = yaml_str[:800] + ("..." if len(yaml_str) > 800 else "")
+        msg = "LLM returned invalid YAML"
+        if errors:
+            msg += " — " + "; ".join(errors)
+        msg += f"\n\nRaw output (first 800 chars):\n{preview}"
+        raise ValueError(msg)
 
     if not isinstance(data, dict):
         raise ValueError("LLM returned unexpected output type, expected a YAML mapping")
@@ -57,6 +77,34 @@ def _validate_yaml(yaml_str: str) -> dict:
         raise ValueError("Generated YAML contains no test cases")
 
     return data
+
+
+def _fix_common_yaml_issues(yaml_str: str) -> str:
+    """Attempt to fix common YAML issues in LLM output.
+
+    - Replace unescaped double quotes inside double-quoted scalar values
+    """
+    import re
+
+    # Pattern: a line like "  field: "value with "unescaped" quotes""
+    # Strategy: find lines where a YAML value starts and ends with double quotes
+    # but contains interior double quotes that aren't escaped.
+    fixed_lines = []
+    for line in yaml_str.split("\n"):
+        # Match: leading spaces + key + ": " + double-quoted value
+        m = re.match(r'^(\s+)([\w.]+:\s*)"(.+)"$', line)
+        if m and '"' in m.group(3):
+            # Interior unescaped double quotes found
+            indent = m.group(1)
+            key = m.group(2)
+            inner = m.group(3)
+            # Escape interior double quotes
+            inner_escaped = inner.replace('"', '\\"')
+            fixed_lines.append(f'{indent}{key}"{inner_escaped}"')
+        else:
+            fixed_lines.append(line)
+
+    return "\n".join(fixed_lines)
 
 
 def _get_api_key(provider: str, api_key: str = "") -> str:

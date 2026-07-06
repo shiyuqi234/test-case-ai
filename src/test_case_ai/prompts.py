@@ -39,12 +39,23 @@ For nested JSON assertions, use dot notation:
 - `user.name` for `{"user": {"name": "..."}}`
 - `data.items.0.id` for `{"data": {"items": [{"id": ...}]}}`
 
+## YAML String Safety （极其重要）
+- NEVER include unescaped double quotes inside a double-quoted YAML string.
+  WRONG: regex: "[A-Za-z0-9]"
+  RIGHT:  regex: '[A-Za-z0-9]'   (use single quotes)
+  RIGHT:  regex: "[A-Za-z0-9]"   (escape: \\" inside double quotes)
+- Regex patterns, validation rules, and special characters MUST use single-quoted strings.
+- If a value contains `'`, use double quotes and escape inner `"` as `\\"`.
+- Do NOT put raw regex patterns like `[A-Z]a-z` inside double-quoted strings.
+
 ## Rules
 - Each test `id` must be unique and snake_case
 - Always set reasonable `timeout` (default 5) and `retry` (default 0, set 1 for GET)
 - Include meaningful `name` that describes what the test verifies
 - Output ONLY the YAML block, no extra text
 - Every test must have an `expect` block with at least `status_code`
+- For ALL test data values (json fields, headers, params), use YAML-safe strings:
+  single quotes preferred; if double quotes are needed, escape internal `"` as `\\"`
 """
 
 

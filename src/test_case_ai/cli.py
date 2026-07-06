@@ -61,6 +61,17 @@ def cmd_generate(args: argparse.Namespace) -> None:
         print(result)
 
 
+def cmd_web(args: argparse.Namespace) -> None:
+    """Handle the 'web' subcommand — start the FastAPI web UI."""
+    import uvicorn
+
+    from .web import app
+
+    print(f"Starting web UI at http://{args.host}:{args.port}")
+    print("Press Ctrl+C to stop.")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+
+
 def main() -> None:
     """Main CLI entry point for `tai`."""
     parser = argparse.ArgumentParser(
@@ -128,6 +139,26 @@ def main() -> None:
         help="Print extra diagnostic info to stderr",
     )
     gen_parser.set_defaults(func=cmd_generate)
+
+    # Web subcommand
+    web_parser = subparsers.add_parser(
+        "web", help="Start web-based GUI"
+    )
+    web_parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        metavar="HOST",
+        help="Host to bind the web server (default: 127.0.0.1)",
+    )
+    web_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        metavar="PORT",
+        help="Port to bind the web server (default: 8000)",
+    )
+    web_parser.set_defaults(func=cmd_web)
 
     args = parser.parse_args()
 

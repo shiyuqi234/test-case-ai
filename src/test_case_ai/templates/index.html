@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Case AI — 智能测试用例生成器</title>
+<style>
+  :root {
+    --bg: #0f1119;
+    --surface: #1a1b2e;
+    --surface2: #222340;
+    --border: #2e3050;
+    --text: #c8d0e8;
+    --text-bright: #e2e6f4;
+    --muted: #6b7094;
+    --primary: #7aa2f7;
+    --primary-dim: rgba(122,162,247,0.12);
+    --success: #9ece6a;
+    --success-dim: rgba(158,206,106,0.12);
+    --error: #f7768e;
+    --error-dim: rgba(247,118,142,0.12);
+    --warning: #e0af68;
+    --warning-dim: rgba(224,175,104,0.12);
+    --info: #7dcfff;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+    --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .app-layout { display: flex; min-height: 100vh; }
+  .main-col { flex: 1; max-width: 900px; margin: 0 auto; padding: 24px 24px 60px; width: 100%; }
+  .history-col {
+    width: 300px; flex-shrink: 0;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: sticky; top: 0;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 0 28px;
+  }
+  header h1 {
+    font-size: 1.9rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--primary) 0%, #bb9af7 50%, var(--info) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -0.02em;
+  }
+  header .subtitle { color: var(--muted); margin-top: 4px; font-size: 0.92rem; }
+  header .badge-row { margin-top: 10px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+    padding: 3px 10px; border-radius: 99px;
+    background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+  }
+  .badge.ai { color: var(--primary); border-color: rgba(122,162,247,0.3); background: var(--primary-dim); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+    padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  .card-header h3 { font-size: 0.95rem; font-weight: 700; color: var(--text-bright); }
+  .card-header .step { font-size: 0.72rem; color: var(--muted); background: var(--surface2); padding: 2px 10px; border-radius: 99px; }
+
+  .tabs {
+    display: flex; gap: 0; margin-bottom: 16px;
+    background: var(--surface2); border-radius: var(--radius-sm); padding: 3px;
+  }
+  .tab-btn {
+    flex: 1; padding: 8px 14px; border: none; background: none;
+    color: var(--muted); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    border-radius: 4px; transition: all 0.2s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { background: var(--surface); color: var(--text-bright); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .preset-chip {
+    font-size: 0.73rem; padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: 99px;
+    background: var(--surface2); color: var(--muted); cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .preset-chip:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-dim); }
+
+  .input-area textarea,
+  .input-area input[type="url"],
+  .input-area input[type="text"],
+  .input-area input[type="password"] {
+    width: 100%; padding: 12px 14px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-family: var(--font); font-size: 0.88rem;
+    transition: border-color 0.2s;
+  }
+  .input-area textarea:focus, .input-area input:focus {
+    outline: none; border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(122,162,247,0.1);
+  }
+  .input-area textarea {
+    resize: vertical; min-height: 100px;
+    font-family: var(--mono); font-size: 0.82rem; line-height: 1.55;
+  }
+  #openapi-area { display: none; }
+
+  .config-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+  }
+  .config-grid label {
+    display: block; font-size: 0.73rem; font-weight: 700; color: var(--muted);
+    margin-bottom: 4px; letter-spacing: 0.05em;
+  }
+  .config-grid select {
+    width: 100%; padding: 9px 10px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size: 0.85rem; cursor: pointer;
+  }
+  .config-grid select:focus { outline: none; border-color: var(--primary); }
+
+  .btn-generate {
+    display: block; width: 100%; margin-top: 18px; padding: 13px;
+    background: linear-gradient(135deg, var(--primary), #89b4fa);
+    color: #0f1119; border: none; border-radius: var(--radius-sm);
+    font-size: 0.95rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.01em;
+  }
+  .btn-generate:hover { opacity: 0.92; }
+  .btn-generate:active { transform: scale(0.985); }
+  .btn-generate:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .spinner { display: none; text-align: center; padding: 20px 0; color: var(--muted); }
+  .spinner.visible { display: block; }
+  .spinner-dot { display: inline-block; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; margin: 0 4px; animation: bounce 1.2s infinite ease-in-out; }
+  .spinner-dot:nth-child(2) { animation-delay: 0.15s; }
+  .spinner-dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+  .error-banner { display: none; margin-top: 14px; padding: 12px 16px; background: var(--error-dim); border: 1px solid rgba(247,118,142,0.3); border-radius: var(--radius-sm); color: var(--error); font-size: 0.85rem; }
+  .error-banner.visible { display: block; }
+
+  /* ============ OUTPUT SECTION ============ */
+  .output-section { display: none; }
+  .output-section.visible { display: block; }
+
+  .stats-strip {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .stat-item {
+    flex: 1; min-width: 100px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    text-align: center;
+  }
+  .stat-item .num { font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
+  .stat-item .lbl { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.05em; margin-top: 2px; }
+  .stat-item.total .num { color: var(--info); }
+  .stat-item.happy .num { color: var(--success); }
+  .stat-item.error-stat .num { color: var(--error); }
+  .stat-item.boundary .num { color: var(--warning); }
+  .stat-item .meta-row { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+  .output-tabs {
+    display: flex; gap: 0; margin-bottom: 14px;
+    border-bottom: 2px solid var(--border);
+  }
+  .out-tab {
+    padding: 8px 16px; border: none; background: none;
+    color: var(--muted); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s;
+  }
+  .out-tab:hover { color: var(--text); }
+  .out-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  .test-cards-view { display: none; }
+  .test-cards-view.visible { display: block; }
+  .yaml-view { display: none; }
+  .yaml-view.visible { display: block; }
+
+  .tc-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 8px;
+    border-left: 3px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .tc-card.happy { border-left-color: var(--success); }
+  .tc-card.error { border-left-color: var(--error); }
+  .tc-card.boundary { border-left-color: var(--warning); }
+  .tc-card.other { border-left-color: var(--info); }
+
+  .tc-card .tc-top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  }
+  .tc-card .tc-id { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+  .tc-card .tc-name { font-weight: 600; font-size: 0.88rem; color: var(--text-bright); margin: 2px 0 4px; }
+  .tc-card .tc-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .tc-card .tc-meta span {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+    background: var(--bg); padding: 2px 8px; border-radius: 3px;
+  }
+  .tc-card .tc-meta .method { font-weight: 700; }
+  .tc-card .tc-meta .method.GET { color: var(--success); }
+  .tc-card .tc-meta .method.POST { color: var(--primary); }
+  .tc-card .tc-meta .method.PUT { color: var(--warning); }
+  .tc-card .tc-meta .method.PATCH { color: var(--warning); }
+  .tc-card .tc-meta .method.DELETE { color: var(--error); }
+  .tc-badge {
+    display: inline-block; font-size: 0.65rem; font-weight: 700;
+    padding: 3px 8px; border-radius: 99px; letter-spacing: 0.05em; flex-shrink: 0;
+  }
+  .tc-badge.happy { background: var(--success-dim); color: var(--success); }
+  .tc-badge.error { background: var(--error-dim); color: var(--error); }
+  .tc-badge.boundary { background: var(--warning-dim); color: var(--warning); }
+  .tc-badge.other { background: var(--primary-dim); color: var(--info); }
+
+  .yaml-output {
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 18px; font-family: var(--mono); font-size: 0.8rem; line-height: 1.6;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+    max-height: 600px; overflow-y: auto;
+  }
+
+  .out-actions {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  }
+  .out-actions h3 { font-size: 0.95rem; color: var(--text-bright); }
+  .btn-group { display: flex; gap: 6px; }
+  .btn-sm {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface2); color: var(--text); font-size: 0.78rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-sm:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-sm.primary { background: var(--primary); color: #0f1119; border-color: var(--primary); font-weight: 700; }
+  .btn-sm.primary:hover { opacity: 0.85; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--success); color: #0f1119; padding: 10px 20px;
+    border-radius: var(--radius-sm); font-weight: 700; font-size: 0.82rem;
+    opacity: 0; transform: translateY(10px); transition: all 0.3s;
+    pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ============ HISTORY ============ */
+  .history-col h3 { font-size: 0.85rem; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 14px; }
+  .history-empty { font-size: 0.8rem; color: var(--muted); text-align: center; padding: 40px 0; line-height: 1.6; }
+  .history-item {
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .history-item:hover { border-color: var(--primary); background: var(--primary-dim); }
+  .history-item .hi-desc { font-size: 0.78rem; font-weight: 600; color: var(--text); margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item .hi-meta { font-size: 0.68rem; color: var(--muted); }
+  .history-item .hi-count { font-size: 0.72rem; color: var(--primary); font-weight: 700; }
+
+  @media (max-width: 860px) {
+    .history-col { display: none; }
+    .config-grid { grid-template-columns: 1fr; }
+    .stats-strip .stat-item { flex: 1 0 40%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+
+<!-- ========== 主内容区 ========== -->
+<div class="main-col">
+
+  <header>
+    <h1>&#x1F9EA; Test Case AI</h1>
+    <p class="subtitle">用自然语言描述 API，AI 自动生成符合 test-sprint-lite 规范的 YAML 测试用例</p>
+    <div class="badge-row">
+      <span class="badge ai">LLM 驱动</span>
+      <span class="badge">OpenAPI 3.x</span>
+      <span class="badge">Swagger 2.0</span>
+      <span class="badge">test-sprint-lite</span>
+      <span class="badge">多 Provider 切换</span>
+    </div>
+  </header>
+
+  <!-- 输入卡片 -->
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F4DD; 输入配置</h3>
+      <span class="step">步骤：描述 API → 选择 Provider → 一键生成</span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="desc">&#x1F4AC; 自然语言描述</button>
+      <button class="tab-btn" data-tab="openapi">&#x1F4D0; OpenAPI Spec URL</button>
+    </div>
+
+    <div class="input-area">
+      <div id="desc-area">
+        <div class="presets">
+          <span style="font-size:0.72rem;color:var(--muted);padding:5px 0;margin-right:4px;">快捷填入：</span>
+          <button class="preset-chip" data-preset="login">&#x1F511; 登录接口</button>
+          <button class="preset-chip" data-preset="crud">&#x1F4E6; 用户 CRUD</button>
+          <button class="preset-chip" data-preset="order">&#x1F6D2; 电商下单</button>
+          <button class="preset-chip" data-preset="search">&#x1F50D; 商品搜索</button>
+          <button class="preset-chip" data-preset="upload">&#x1F4C1; 文件上传</button>
+        </div>
+        <textarea id="desc-input" placeholder="在这里用自然语言描述你的 API 接口……
+
+示例：
+  POST /api/login — 请求体: {username, password} — 返回: {token, refresh_token, user: {id, name, role}}
+  GET /api/users?role=admin&page=1&limit=20 — 返回分页用户列表
+  POST /api/orders — 请求体: {customer_id, items: [{product_id, quantity}], shipping_address} — 需要 Bearer token 认证
+  GET /api/products/search?q=关键词&category=electronics&sort=price — 全文搜索，返回分面结果"></textarea>
+      </div>
+      <div id="openapi-area">
+        <input type="url" id="openapi-url-input"
+               placeholder="https://petstore.swagger.io/v2/swagger.json"
+               autocomplete="off">
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">粘贴任意 Swagger / OpenAPI 的 JSON 或 YAML 地址，工具会自动识别 Spec 版本。</p>
+      </div>
+    </div>
+
+    <div class="config-grid">
+      <div>
+        <label for="provider-select">LLM Provider</label>
+        <select id="provider-select">
+          <option value="anthropic">&#x1F9E0; Anthropic Claude</option>
+          <option value="deepseek">&#x1F30A; DeepSeek</option>
+          <option value="openai">&#x1F4EE; OpenAI</option>
+        </select>
+      </div>
+      <div>
+        <label for="model-input">模型</label>
+        <input type="text" id="model-input" placeholder="claude-sonnet-5" autocomplete="off">
+      </div>
+      <div>
+        <label for="api-key-input">API Key（留空则自动读取环境变量）</label>
+        <input type="password" id="api-key-input" placeholder="留空 = 自动从环境变量读取；或直接粘贴 sk-xxx" autocomplete="off">
+      </div>
+      <div>
+        <label for="base-url-input">Base URL（可选）</label>
+        <input type="text" id="base-url-input" placeholder="https://api.example.com" autocomplete="off">
+      </div>
+    </div>
+
+    <button class="btn-generate" id="generate-btn">&#x1F680; 生成测试用例</button>
+    <div class="spinner" id="spinner">
+      <span style="display:block;margin-bottom:8px;">&#x1F9E0; AI 正在分析接口并生成测试用例...</span>
+      <span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span>
+      <br><span style="font-size:0.72rem;color:var(--muted);">根据 Provider 不同，通常需要 3-10 秒</span>
+    </div>
+    <div class="error-banner" id="error-banner"></div>
+  </div>
+
+  <!-- ========== 输出区域 ========== -->
+  <div class="output-section" id="output-section">
+
+    <!-- 统计条 -->
+    <div class="stats-strip" id="stats-strip">
+      <div class="stat-item total">
+        <div class="num" id="stat-total">-</div>
+        <div class="lbl">用例总数</div>
+      </div>
+      <div class="stat-item happy">
+        <div class="num" id="stat-happy">-</div>
+        <div class="lbl">正常流程</div>
+      </div>
+      <div class="stat-item error-stat">
+        <div class="num" id="stat-errors">-</div>
+        <div class="lbl">异常用例</div>
+      </div>
+      <div class="stat-item boundary">
+        <div class="num" id="stat-boundary">-</div>
+        <div class="lbl">边界测试</div>
+      </div>
+      <div class="stat-item" style="flex:0.6;">
+        <div class="meta-row" id="stat-time">-</div>
+        <div class="meta-row" id="stat-provider">-</div>
+      </div>
+    </div>
+
+    <!-- 输出卡片 -->
+    <div class="card">
+      <div class="out-actions">
+        <h3>&#x2705; 生成的测试用例</h3>
+        <div class="btn-group">
+          <button class="btn-sm" id="copy-btn">&#x1F4CB; 复制 YAML</button>
+          <button class="btn-sm primary" id="download-btn">&#x1F4E5; 下载 .yaml</button>
+        </div>
+      </div>
+
+      <div class="output-tabs">
+        <button class="out-tab active" data-view="cards">&#x1F0CF; 用例卡片</button>
+        <button class="out-tab" data-view="yaml">&#x1F4C4; YAML 源码</button>
+      </div>
+
+      <!-- 卡片视图 -->
+      <div class="test-cards-view visible" id="test-cards-view">
+        <div id="test-cards-container"></div>
+      </div>
+
+      <!-- YAML 视图 -->
+      <div class="yaml-view" id="yaml-view">
+        <pre class="yaml-output" id="yaml-output"></pre>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-col -->
+
+<!-- ========== 历史记录侧栏 ========== -->
+<div class="history-col">
+  <h3>&#x1F4AC; 生成历史</h3>
+  <div id="history-list">
+    <div class="history-empty">
+      <div style="font-size:2rem;margin-bottom:8px;">&#x1F4AD;</div>
+      暂无历史记录。<br>生成你的第一个测试用例吧！
+    </div>
+  </div>
+</div>
+
+</div><!-- /app-layout -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ========== 数据定义 ==========
+  var PROVIDERS = {
+    anthropic: { default_model: 'claude-sonnet-5', env_var: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude' },
+    deepseek:  { default_model: 'deepseek-chat',   env_var: 'DEEPSEEK_API_KEY',   label: 'DeepSeek' },
+    openai:    { default_model: 'gpt-4o',          env_var: 'OPENAI_API_KEY',      label: 'OpenAI' },
+  };
+
+  var PRESETS = {
+    login: "POST /api/auth/login — body: {username: string, password: string} — returns: {access_token, refresh_token, user: {id, name, email, role}} — headers: Content-Type: application/json — auth: none",
+    crud: "REST API for User resource:\n  GET /api/users — list users, supports ?page&limit&role filter, returns paginated {items: [...], total, page}\n  GET /api/users/{id} — get single user, returns {id, name, email, role, created_at}\n  POST /api/users — create user, body: {name, email, password, role}, returns 201\n  PUT /api/users/{id} — update user, body: {name?, email?, role?}\n  DELETE /api/users/{id} — soft delete, returns 204",
+    order: "POST /api/orders — create order — body: {customer_id: int, items: [{product_id: int, quantity: int}], shipping_address: {street, city, zip, country}, payment_method: string} — returns: {order_id, status, total_amount, created_at} — auth: Bearer token required",
+    search: "GET /api/products/search — full-text search — params: ?q=keyword&category=electronics&min_price=10&max_price=1000&sort=price_asc&page=1&limit=20 — returns: {results: [{id, name, price, rating, in_stock}], facets: {categories, price_ranges}, total_hits}",
+    upload: "POST /api/files/upload — multipart file upload — form: {file: binary, description: string, tags: string[]} — headers: Content-Type: multipart/form-data, Authorization: Bearer xxx — returns: {file_id, url, size_bytes, mime_type} — max file size: 10MB"
+  };
+
+  // ========== DOM 引用 ==========
+  var tabBtns = document.querySelectorAll('.tab-btn');
+  var descArea = document.getElementById('desc-area');
+  var openapiArea = document.getElementById('openapi-area');
+  var descInput = document.getElementById('desc-input');
+  var openapiUrlInput = document.getElementById('openapi-url-input');
+  var providerSelect = document.getElementById('provider-select');
+  var modelInput = document.getElementById('model-input');
+  var apiKeyInput = document.getElementById('api-key-input');
+  var baseUrlInput = document.getElementById('base-url-input');
+  var generateBtn = document.getElementById('generate-btn');
+  var spinner = document.getElementById('spinner');
+  var errorBanner = document.getElementById('error-banner');
+  var outputSection = document.getElementById('output-section');
+  var yamlOutput = document.getElementById('yaml-output');
+  var testCardsContainer = document.getElementById('test-cards-container');
+  var copyBtn = document.getElementById('copy-btn');
+  var downloadBtn = document.getElementById('download-btn');
+  var toast = document.getElementById('toast');
+  var historyList = document.getElementById('history-list');
+  var outTabs = document.querySelectorAll('.out-tab');
+
+  var currentInputType = 'desc';
+  var lastYaml = '';
+  var genStartTime = 0;
+  var genHistory = [];
+
+  // ========== 标签切换 ==========
+  tabBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      tabBtns.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentInputType = btn.dataset.tab;
+      descArea.style.display = currentInputType === 'desc' ? 'block' : 'none';
+      openapiArea.style.display = currentInputType === 'openapi' ? 'block' : 'none';
+      hideError();
+    });
+  });
+
+  // ========== 预设场景 ==========
+  document.querySelectorAll('.preset-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      var key = chip.dataset.preset;
+      if (PRESETS[key]) {
+        descInput.value = PRESETS[key];
+        tabBtns.forEach(function(b) { b.classList.remove('active'); });
+        document.querySelector('[data-tab="desc"]').classList.add('active');
+        currentInputType = 'desc';
+        descArea.style.display = 'block';
+        openapiArea.style.display = 'none';
+        descInput.focus();
+      }
+    });
+  });
+
+  // ========== Provider 切换 ==========
+  function updateModelPlaceholder() {
+    var p = providerSelect.value;
+    var cfg = PROVIDERS[p];
+    modelInput.placeholder = cfg.default_model;
+    apiKeyInput.placeholder = '从环境变量 ' + cfg.env_var + ' 读取';
+  }
+  providerSelect.addEventListener('change', updateModelPlaceholder);
+  updateModelPlaceholder();
+
+  // ========== 输出视图切换 ==========
+  outTabs.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      outTabs.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var view = btn.dataset.view;
+      document.getElementById('test-cards-view').classList.toggle('visible', view === 'cards');
+      document.getElementById('yaml-view').classList.toggle('visible', view === 'yaml');
+    });
+  });
+
+  // ========== 工具函数 ==========
+  function showSpinner() {
+    spinner.classList.add('visible');
+    generateBtn.disabled = true;
+    outputSection.classList.remove('visible');
+    hideError();
+    genStartTime = Date.now();
+  }
+
+  function hideSpinner() {
+    spinner.classList.remove('visible');
+    generateBtn.disabled = false;
+  }
+
+  function showError(msg) {
+    errorBanner.innerHTML = '&#x26A0;&#xFE0F; ' + escapeHtml(msg);
+    errorBanner.classList.add('visible');
+    errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideError() { errorBanner.classList.remove('visible'); }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(function() { toast.classList.remove('show'); }, 2200);
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ========== YAML 轻量解析 ==========
+  function parseYamlToTests(yaml) {
+    var tests = [];
+    var lines = yaml.split('\n');
+    var current = null;
+    var inTests = false;
+    var suiteName = '';
+    var baseUrl = '';
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (/^name:\s*(.+)/.test(line) && !inTests) {
+        suiteName = line.match(/^name:\s*(.+)/)[1].trim();
+      }
+      if (/^base_url:\s*(.+)/.test(line) && !inTests) {
+        baseUrl = line.match(/^base_url:\s*(.+)/)[1].trim();
+      }
+      if (/^tests:\s*$/.test(line.trim())) {
+        inTests = true;
+        continue;
+      }
+      if (!inTests) continue;
+
+      var idMatch = line.match(/^\s+-\s+id:\s*(.+)/);
+      if (idMatch) {
+        if (current) tests.push(current);
+        current = {
+          id: idMatch[1].trim(),
+          name: '', method: '', path: '', timeout: 5, retry: 0,
+          expected_status: '', body_fields: [], headers: {},
+          raw_lines: []
+        };
+      }
+      if (!current) continue;
+
+      current.raw_lines.push(line);
+
+      var nameMatch = line.match(/^\s+name:\s*(.+)/);
+      if (nameMatch) current.name = nameMatch[1].trim();
+
+      var methodMatch = line.match(/^\s+method:\s*(.+)/);
+      if (methodMatch) current.method = methodMatch[1].trim().toUpperCase();
+
+      var pathMatch = line.match(/^\s+path:\s*(.+)/);
+      if (pathMatch) current.path = pathMatch[1].trim();
+
+      var timeoutMatch = line.match(/^\s+timeout:\s*(.+)/);
+      if (timeoutMatch) current.timeout = parseInt(timeoutMatch[1]) || 5;
+
+      var retryMatch = line.match(/^\s+retry:\s*(.+)/);
+      if (retryMatch) current.retry = parseInt(retryMatch[1]) || 0;
+
+      var expectMatch = line.match(/^\s+status_code:\s*(.+)/);
+      if (expectMatch) current.expected_status = expectMatch[1].trim();
+    }
+    if (current) tests.push(current);
+
+    return { suite_name: suiteName, base_url: baseUrl, tests: tests };
+  }
+
+  function categorizeTest(tc) {
+    var s = parseInt(tc.expected_status) || 0;
+    if (s >= 200 && s < 300) return 'happy';
+    if (s >= 400 && s < 500) return 'error';
+    if (s >= 500) return 'error';
+    var n = (tc.name + tc.id).toLowerCase();
+    if (/invalid|error|fail|missing|not.?found|unauthorized|forbidden|bad.?request/.test(n)) return 'error';
+    if (/empty|max|min|boundary|edge|long|special|unicode|overflow|limit/.test(n)) return 'boundary';
+    if (tc.expected_status === '' && (/success|happy|valid|normal|ok/.test(n))) return 'happy';
+    return 'boundary';
+  }
+
+  function renderTestCards(parsed) {
+    var labels = { happy: '正常流程', error: '异常测试', boundary: '边界测试', other: '其他' };
+    var html = '';
+    parsed.tests.forEach(function(tc) {
+      var cat = categorizeTest(tc);
+      html += '<div class="tc-card ' + cat + '">';
+      html += '<div class="tc-top">';
+      html += '<div style="flex:1;">';
+      html += '<div class="tc-id">' + escapeHtml(tc.id) + '</div>';
+      html += '<div class="tc-name">' + escapeHtml(tc.name || tc.id) + '</div>';
+      html += '<div class="tc-meta">';
+      html += '<span class="method ' + tc.method + '">' + escapeHtml(tc.method || 'GET') + '</span>';
+      html += '<span>' + escapeHtml(tc.path || '/') + '</span>';
+      if (tc.expected_status) html += '<span>期望 ' + escapeHtml(tc.expected_status) + '</span>';
+      html += '<span>Timeout ' + tc.timeout + 's</span>';
+      html += '</div>';
+      html += '</div>';
+      html += '<span class="tc-badge ' + cat + '">' + (labels[cat] || '') + '</span>';
+      html += '</div>';
+      html += '</div>';
+    });
+    testCardsContainer.innerHTML = html;
+  }
+
+  function updateStats(parsed, durationMs, provider) {
+    var total = parsed.tests.length;
+    var happy = 0, errors = 0, boundary = 0;
+    parsed.tests.forEach(function(tc) {
+      var cat = categorizeTest(tc);
+      if (cat === 'happy') happy++;
+      else if (cat === 'error') errors++;
+      else boundary++;
+    });
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-happy').textContent = happy;
+    document.getElementById('stat-errors').textContent = errors;
+    document.getElementById('stat-boundary').textContent = boundary;
+    document.getElementById('stat-time').textContent = '耗时 ' + (durationMs / 1000).toFixed(1) + ' 秒';
+    document.getElementById('stat-provider').textContent = 'Provider: ' + provider;
+  }
+
+  // ========== 历史记录 ==========
+  function addHistory(desc, yaml, testCount, provider) {
+    var item = {
+      desc: desc.substring(0, 60),
+      yaml: yaml,
+      count: testCount,
+      provider: provider,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+    genHistory.unshift(item);
+    if (genHistory.length > 20) genHistory.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (genHistory.length === 0) {
+      historyList.innerHTML = '<div class="history-empty"><div style="font-size:2rem;margin-bottom:8px;">&#x1F4AD;</div>暂无历史记录。<br>生成你的第一个测试用例吧！</div>';
+      return;
+    }
+    var html = '';
+    genHistory.forEach(function(h, i) {
+      html += '<div class="history-item" data-idx="' + i + '">';
+      html += '<div class="hi-desc">' + escapeHtml(h.desc) + '</div>';
+      html += '<div class="hi-meta">' + h.time + ' &middot; ' + h.provider + '</div>';
+      html += '<div class="hi-count">' + h.count + ' 条用例</div>';
+      html += '</div>';
+    });
+    historyList.innerHTML = html;
+
+    historyList.querySelectorAll('.history-item').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var idx = parseInt(el.dataset.idx);
+        showOutput(genHistory[idx].yaml, genHistory[idx].provider);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  // ========== 展示输出 ==========
+  function showOutput(yaml, provider) {
+    lastYaml = yaml;
+    yamlOutput.textContent = yaml;
+
+    var parsed = parseYamlToTests(yaml);
+    renderTestCards(parsed);
+
+    var duration = genStartTime ? Date.now() - genStartTime : 0;
+    updateStats(parsed, duration, provider || providerSelect.value);
+
+    outputSection.classList.add('visible');
+    outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ========== 生成 ==========
+  generateBtn.addEventListener('click', function() {
+    var provider = providerSelect.value;
+    var payload = {
+      input_type: currentInputType,
+      provider: provider,
+      api_key: apiKeyInput.value,
+      model: modelInput.value,
+      base_url: baseUrlInput.value,
+      description: '',
+      openapi_url: '',
+    };
+
+    if (currentInputType === 'desc') {
+      payload.description = descInput.value.trim();
+      if (!payload.description) {
+        showError('请输入 API 描述，或点击"快捷填入"选择预设场景。');
+        return;
+      }
+    } else {
+      payload.openapi_url = openapiUrlInput.value.trim();
+      if (!payload.openapi_url) {
+        showError('请输入 OpenAPI Spec URL。');
+        return;
+      }
+    }
+
+    showSpinner();
+
+    fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      hideSpinner();
+      if (data.success) {
+        showOutput(data.yaml, provider);
+        var desc = currentInputType === 'desc' ? payload.description : payload.openapi_url;
+        var parsed = parseYamlToTests(data.yaml);
+        addHistory(desc, data.yaml, parsed.tests.length, provider);
+      } else {
+        showError(data.error || '生成失败，请稍后重试。');
+      }
+    })
+    .catch(function(err) {
+      hideSpinner();
+      showError('网络错误：' + err.message + '，请确认服务是否仍在运行。');
+    });
+  });
+
+  // ========== 复制 / 下载 ==========
+  copyBtn.addEventListener('click', function() {
+    if (!lastYaml) return;
+    navigator.clipboard.writeText(lastYaml).then(function() {
+      showToast('✓ YAML 已复制到剪贴板！');
+    }).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = lastYaml; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('✓ 已复制！');
+    });
+  });
+
+  downloadBtn.addEventListener('click', function() {
+    if (!lastYaml) return;
+    var blob = new Blob([lastYaml], { type: 'text/yaml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'test-cases.yaml';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✓ 已下载 test-cases.yaml');
+  });
+
+  // ========== 快捷键 ==========
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      generateBtn.click();
+    }
+  });
+</script>
+
+</body>
+</html>
