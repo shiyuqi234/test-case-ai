@@ -189,12 +189,13 @@ Generated tests cover:
 |---|---:|---:|---:|---:|
 | Petstore v2 | 4 | 22 | 54.5% | 10.0s |
 | Petstore v3 | 4 | 33 | 45.5% | 14.2s |
-| httpbin | 5 | 38 | 89.5% | 10.2s |
-| **Total** | **13** | **93** | **65.6%** | **34.4s** |
+| httpbin | 5 | 38 | 92.1% | 10.2s |
+| **Total** | **13** | **93** | **66.7%** | **34.4s** |
 
 - 13 endpoints covered, 93 cases generated in a single run, **100% YAML parseable**.
 - Average **2.65 s per endpoint** (vs. 8–15 min of manual authoring).
 - Failure root causes across 32 failed cases: **AI assertion errors 50%**, target-API defects 41%, executor-tool defects 9% — reinforcing the "AI generates + human reviews" workflow.
+- 注：httpbin 的 92.1% 是修复 [test-sprint-lite](https://github.com/shiyuqi234/test-sprint-lite) 的 `deep_get` 数组索引缺陷后复测的值（数组路径断言用例 +1 转绿）；Petstore v2/v3 因第三方 mock 服务临时返回 502 未复测。
 
 ---
 
