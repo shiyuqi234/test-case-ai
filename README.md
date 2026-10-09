@@ -181,6 +181,21 @@ Generated tests cover:
 - ❌ **Error Scenarios** — missing fields, invalid types, auth failures
 - 📊 **Data Validation** — response structure and field type checks
 
+## Quantitative Evaluation
+
+> Measured with DeepSeek `deepseek-chat` on 3 real OpenAPI specs; generated cases were executed by [test-sprint-lite](https://github.com/shiyuqi234/test-sprint-lite) against the live APIs.
+
+| Spec | Endpoints | Generated cases | First-run pass rate | Generation time |
+|---|---:|---:|---:|---:|
+| Petstore v2 | 4 | 22 | 54.5% | 10.0s |
+| Petstore v3 | 4 | 33 | 45.5% | 14.2s |
+| httpbin | 5 | 38 | 89.5% | 10.2s |
+| **Total** | **13** | **93** | **65.6%** | **34.4s** |
+
+- 13 endpoints covered, 93 cases generated in a single run, **100% YAML parseable**.
+- Average **2.65 s per endpoint** (vs. 8–15 min of manual authoring).
+- Failure root causes across 32 failed cases: **AI assertion errors 50%**, target-API defects 41%, executor-tool defects 9% — reinforcing the "AI generates + human reviews" workflow.
+
 ---
 
 <a name="chinese"></a>
